@@ -27,6 +27,7 @@ library(grid)
 library(ggpubr)
 library(tidyverse)
 library(dplyr)
+options(knitr.kable.NA = '')
 ```
 
 - Here we define directory paths used by downstream chunks to read
@@ -64,7 +65,9 @@ infodat<-read.csv("Data/peso_testset_mapping.csv") %>%
         cancer non-cancer 
             71         89 
 
-## Figure 1
+## rSiMFD workflow
+
+### Figure 1
 
 - We select two representative slides and build a long RGB dataframe for
   every pixel of each selected patch. This enables ggplot-based raster
@@ -137,7 +140,9 @@ vs. cancer patches from two subjects.
 
 ![](Figures/Figure1a.jpg)
 
-![](Figures/Figure1b.jpg) \## Image to SiMFD
+![](Figures/Figure1b.jpg)
+
+### Image to SiMFD
 
 - We load a single image patch, convert it to grayscale, and extract a
   smaller sub-region to keep visuals compact. We then assemble a tidy
@@ -159,11 +164,11 @@ im_dat1<-as.data.frame(patch_im,wide="c")%>%
          EGcell=ifelse(Gvalue<0.35,"#5F9EA0",ifelse(Gvalue>0.90,"#ff9f00","#FFFFFF"))) %>%
   pivot_longer(c("rgb_val","gray_val","Epcell","Gcell","EGcell"),names_to = "Type",values_to = "RGBcolor") %>%
   mutate(Type=factor(recode(Type,
-                            "rgb_val"="RGB",
-                            "gray_val"="Grayscale",
+                            "rgb_val"="Image in RGB scale",
+                            "gray_val"="Image in grayscale",
                             "Epcell"="Epithelial pixels (gray intensity < 0.35)",
                             "Gcell"="Gland pixels (gray intensity > 0.90)",
-                            "EGcell"="Epithelial and Gland"),levels=c("RGB","Grayscale","Epithelial pixels (gray intensity < 0.35)","Gland pixels (gray intensity > 0.90)","Epithelial and Gland")))
+                            "EGcell"="Epithelial and Gland"),levels=c("Image in RGB scale","Image in grayscale","Epithelial pixels (gray intensity < 0.35)","Gland pixels (gray intensity > 0.90)","Epithelial and Gland")))
 ```
 
 - We visualize the sub-region in multiple representations—RGB,
@@ -185,7 +190,7 @@ im_dat1 %>%
 ![](README_files/figure-commonmark/unnamed-chunk-9-1.png)
 
 ``` r
-ggsave("Figures/Figure2.jpg",height=8,width = 8,dpi = 300)
+ggsave("Figures/Figure2.jpg",height=4,width = 6,dpi = 300)
 ```
 
 - For subsequent geometric summaries, we rebuild a compact color/gray
@@ -425,7 +430,7 @@ GFun<-apply(ss,1,function(v){
 })
 ```
 
-## Figure 3
+### Figure 3
 
 - (Figure 3) We assemble a multi-panel figure: (i) segmented image with
   rings at ( s_1 ), (ii) segmented image with rings at ( s_2 ), (iii)
@@ -433,7 +438,7 @@ GFun<-apply(ss,1,function(v){
   function summaries. The figure is written to `Figures/Figure3.pdf`.
 
 ``` r
-pdf("Figures/Figure3.pdf",width=8,height=4)
+jpeg("Figures/Figure3.jpg",width=800,height=400,quality = 600)
 par(mfrow=c(2,3),mai = c(0.35, 0.35, 0.35, 0.35))
 plot.new()
 plot.window(xlim=c(0,250),ylim=rev(c(0,250)))
@@ -502,7 +507,15 @@ dev.off()
 
 ![](Figures/Figure3.jpg)
 
-## Table 1
+## Pre-trained CNNs
+
+We have nine (09) scripts in the directory **PESO_RCodes**, which were
+used to obtain results shown in Table 1. Files are named in a structure
+defined as **architecture_peso_setting.py**, where `architecture` stands
+for the CNN architechture used and `setting` indicates the weighting
+scheme considered.
+
+### Table 1
 
 ``` r
 mblnetN<-read.csv("PESO_Results/pre_train_cnn_res/cnn_res_mn.csv")
@@ -517,7 +530,26 @@ incV3NW<-read.csv("PESO_Results/pre_train_cnn_res/inceptionV3_nweight.csv")
 ```
 
 ``` r
-mblnetN %>%
+sd_Table1<-mblnetN %>%
+  add_case(mblnetT) %>%
+  add_case(mblnetNW) %>%
+  add_case(rsnetN) %>%
+  add_case(rsnetT) %>%
+  add_case(rsnetNW) %>%
+  add_case(incV3N) %>%
+  add_case(incV3T) %>%
+  add_case(incV3NW) %>%
+  mutate(CNN=rep(c("MobileNet","ResNet50","InceptionV3"),each=75),
+         Version=rep(1:3,each=25,times=3)) %>%
+  group_by(CNN,Version) %>%
+  summarise_all(sd) %>%
+  ungroup() %>%
+  dplyr::select(Accuracy,tAccuracy,Sensitivity,tSensitivity,Specificity,tSpecificity) %>% 
+  as.matrix() %>%
+    as.numeric()
+
+
+Table1<-mblnetN %>%
   add_case(mblnetT) %>%
   add_case(mblnetNW) %>%
   add_case(rsnetN) %>%
@@ -532,17 +564,27 @@ mblnetN %>%
   summarise_all(mean) %>%
   ungroup() %>%
   dplyr::select(CNN,Version,Accuracy,tAccuracy,Sensitivity,tSensitivity,Specificity,tSpecificity) %>%
-  mutate(CNN=replace(CNN,duplicated(CNN),"")) %>%
-  kableExtra::kbl(col.names = c("CNN","Version",rep(c("Training","Test"),times=3)),escape = FALSE,booktabs = TRUE,linesep = "",digits = 3,caption = "Accuracy, sensitivity, specificity and AUC observed for PESO data using different CNN architectures in the cases of training ($120$ patches from $30$ subject) and test data ($40$ patches from $10$ subjects).") %>%
+  mutate(CNN=replace(CNN,duplicated(CNN),"")) 
+
+Table1 %>%
+  kableExtra::kbl(col.names = c("CNN","Version",rep(c("Training","Test"),times=3)),escape = FALSE,booktabs = TRUE,linesep = "",digits = 3,caption = "Accuracy, sensitivity, specificity and AUC observed for PESO data using different CNN architectures in the cases of training data ($120$ patches from $30$ subject) and test data ($40$ patches from $10$ subjects).",label = "cnn_res",format = "latex",position = "!htb") %>%
   kableExtra::kable_classic_2() %>%
-  kableExtra::add_header_above(header = c("","","Accuracy"=2,"Sensitivity"=2,"Specificity"=2))
+  kableExtra::add_header_above(header = c("","","Accuracy"=2,"Sensitivity"=2,"Specificity"=2)) %>%
+    kableExtra::add_footnote(paste("Standard errors lie in [",round(min(sd_Table1/sqrt(25)),3),",",formatC(max(sd_Table1/sqrt(25)),3,format = "f"),"]."," Versions: pre-trained weight+no update (1); pre-trained + update (2); estimated weight (3).",sep=""),notation = "none",escape = FALSE) %>%
+      kableExtra::save_kable("Tables/Table1.tex")
+
+Table1 %>%
+  kableExtra::kbl(col.names = c("CNN","Version",rep(c("Training","Test"),times=3)),escape = FALSE,booktabs = TRUE,linesep = "",digits = 3,caption = "Accuracy, sensitivity, specificity and AUC observed for PESO data using different CNN architectures in the cases of training data ($120$ patches from $30$ subject) and test data ($40$ patches from $10$ subjects).",label = "cnn_res") %>%
+  kableExtra::kable_classic_2() %>%
+  kableExtra::add_header_above(header = c("","","Accuracy"=2,"Sensitivity"=2,"Specificity"=2)) %>%
+    kableExtra::add_footnote(c(paste("Standard errors lie in [",round(min(sd_Table1/sqrt(25)),3),",",formatC(max(sd_Table1/sqrt(25)),3,format = "f"),"].",sep=""),"Versions: pre-trained weight+no update (1); pre-trained + update (2); estimated weight (3)."),notation = "none",escape = FALSE)
 ```
 
 <table class="lightable-classic-2" data-quarto-postprocess="true"
 style="font-family: &quot;Arial Narrow&quot;, &quot;Source Sans Pro&quot;, sans-serif; margin-left: auto; margin-right: auto;">
 <caption>Accuracy, sensitivity, specificity and AUC observed for PESO
-data using different CNN architectures in the cases of training ($120$
-patches from $30$ subject) and test data ($40$ patches from $10$
+data using different CNN architectures in the cases of training data
+($120$ patches from $30$ subject) and test data ($40$ patches from $10$
 subjects).</caption>
 <colgroup>
 <col style="width: 12%" />
@@ -685,26 +727,95 @@ data-quarto-table-cell-role="th">Test</th>
 <td style="text-align: right;">0.209</td>
 <td style="text-align: right;">0.192</td>
 </tr>
-</tbody>
-</table>
+</tbody><tfoot>
+<tr>
+<td style="text-align: left; padding: 0; border: 0;"><sup></sup>
+Standard errors lie in [0.008,0.100].</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr>
+<td style="text-align: left; padding: 0; border: 0;"><sup></sup>
+Versions: pre-trained weight+no update (1); pre-trained + update (2);
+estimated weight (3).</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tfoot>
+&#10;</table>
 
-## Table 2
+## Proposed method
+
+Scripts used to obtain results for various spatial grid choices are
+available in the directory **PESO_RCodes**. Files have names defined as
+“PESOdata$\#$.R”, where $\#$ stands for the grid size. Running these
+script require few input files, **peso_testset_mapping.csv** and
+grid-size-specific derived rSiMFD, to be stored in the working
+directory. Originally, we run each script separately, using a parallel
+computing setting with 25 computing nodes.
+
+<!-- Note that this paper has an associated **R** package, which is built later. Consequently, the scripts used for **data analysis** and **simulation study** do not use the package directly. Specifically, sources codes used in these scripts were utilized to build the package, with slightly different structure.  -->
+
+### Table 2
 
 ``` r
+sd_rpeso<-res_peso %>%
+  pivot_wider(id_cols = c(Subjects,Method,Variants,Grid),names_from = MType, values_from = ends_with("_sd")) %>%
+    dplyr::select(-ends_with("_sd_2"))
+```
+
+``` r
+options(knitr.kable.NA = '')
 gs<-9
-rpeso %>%
-  dplyr::select(c(4,1:3,5,7,9,11,6,8,10,12)) %>%
+Table2<-rpeso %>%
+  dplyr::select(Subjects,Grid,Method,Variants,contains("_Accuracy_"),contains("_Sensitivity"),contains("_Specificity_"),contains("_AUC_")) %>%
   filter(Subjects==30) %>%
   dplyr::select(-Subjects) %>%
   filter(Grid==gs) %>%
-  dplyr::select(-Grid) %>%
+  dplyr::select(-Grid) %>% 
   group_by(Method) %>%
-  mutate(Method=replace(Method,duplicated(Method),"")) %>%
-  kableExtra::kbl(col.names = c("Method","Version",rep(c("Accuracy","Sensitivity","Specificity","AUC"),2)) ,escape = FALSE,booktabs = TRUE,linesep = "",digits = 3,caption = paste("Accuracy, sensitivity, specificity and AUC observed for PESO data using the proposed approach with different classifiers in the cases of training ($120$ patches from $30$ subject) and test data ($40$ patches from $10$ subjects) when Q functions were obtained from a ",gs,"$\\times$",gs,"grid.")) %>%
+  mutate(Method=replace(Method,duplicated(Method),"")) 
+
+Table2 %>%
+  kableExtra::kbl(col.names = c("Method","Version",rep(c("Training","Test"),4)) ,escape = FALSE,format="latex",booktabs = TRUE,linesep = "",digits = 3,label = "peso_class_res",caption = paste("Accuracy, sensitivity, specificity and AUC observed for PESO data using the proposed approach with different classifiers in the cases of training data ($120$ patches from $30$ subject) and test data ($40$ patches from $10$ subjects) when Q functions were obtained from a ",gs,"$\\times$",gs,"grid. Results are summarized from 100 such random splits.")) %>%
   kableExtra::kable_classic_2() %>%
   kableExtra::kable_styling(latex_options = "scale_down") %>%
-  kableExtra::add_header_above(header = c("","","Subject-specific mean"=4,"Grand mean"=4)) %>%
-  kableExtra::add_footnote(c(paste("Standard errors lie in [",round(min(rpeso[which(rpeso $Subjects==30&rpeso$Grid==gs),seq(13,20,2)])/sqrt(100),3),",",round(max(rpeso[which(rpeso $Subjects==30&rpeso$Grid==gs),seq(13,20,2)])/sqrt(100),3),"]"),"$GAM_1$ and $GAM_2$ use univariate and bivariate smooth terms, respectively"),notation = "none",escape = FALSE)
+  kableExtra::add_header_above(header = c("","","Accuracy"=2,"Sensitivity"=2,"Specificity"=2,"AUC"=2)) %>%
+  kableExtra::add_footnote(c(paste("Standard errors lie in [",round(min(sd_rpeso %>%
+    filter(Subjects==30&Grid==gs) %>%
+      dplyr::select(-Subjects,-Method,-Variants,-Grid) %>%
+      as.matrix() %>%
+        as.numeric()/sqrt(100)),3),",",round(max(sd_rpeso %>%
+    filter(Subjects==30&Grid==gs) %>%
+      dplyr::select(-Subjects,-Method,-Variants,-Grid) %>%
+      as.matrix() %>%
+        as.numeric()/sqrt(100)),3),"].",sep=""),"$GAM_1$ and $GAM_2$ use univariate and bivariate smooth terms, respectively."),notation = "none",escape = FALSE) %>%
+          kableExtra::save_kable("Tables/Table2.tex")
+
+Table2 %>%
+  kableExtra::kbl(col.names = c("Method","Version",rep(c("Training","Test"),4)) ,escape = FALSE,booktabs = TRUE,linesep = "",digits = 3,label = "peso_class_res",caption = paste("Accuracy, sensitivity, specificity and AUC observed for PESO data using the proposed approach with different classifiers in the cases of training ($120$ patches from $30$ subject) and test data ($40$ patches from $10$ subjects) when Q functions were obtained from a ",gs,"$\\times$",gs,"grid.")) %>%
+  kableExtra::kable_classic_2() %>%
+  kableExtra::kable_styling(latex_options = "scale_down") %>%
+  kableExtra::add_header_above(header = c("","","Accuracy"=2,"Sensitivity"=2,"Specificity"=2,"AUC"=2)) %>%
+  kableExtra::add_footnote(c(paste("Standard errors lie in [",round(min(sd_rpeso %>%
+    filter(Subjects==30&Grid==gs) %>%
+      dplyr::select(-Subjects,-Method,-Variants,-Grid) %>%
+      as.matrix() %>%
+        as.numeric()/sqrt(100)),3),",",round(max(sd_rpeso %>%
+    filter(Subjects==30&Grid==gs) %>%
+      dplyr::select(-Subjects,-Method,-Variants,-Grid) %>%
+      as.matrix() %>%
+        as.numeric()/sqrt(100)),3),"].",sep=""),"$GAM_1$ and $GAM_2$ use univariate and bivariate smooth terms, respectively."),notation = "none",escape = FALSE)
 ```
 
 <table class="lightable-classic-2 table" data-quarto-postprocess="true"
@@ -732,15 +843,25 @@ $\times$ 9 grid.</caption>
 style="text-align: left; empty-cells: hide;"></th>
 <th data-quarto-table-cell-role="th"
 style="text-align: left; empty-cells: hide;"></th>
-<th colspan="4" data-quarto-table-cell-role="th"
+<th colspan="2" data-quarto-table-cell-role="th"
 style="text-align: center; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div
 style="border-bottom: 1px solid #111111; margin-bottom: -1px; ">
-Subject-specific mean
+Accuracy
 </div></th>
-<th colspan="4" data-quarto-table-cell-role="th"
+<th colspan="2" data-quarto-table-cell-role="th"
 style="text-align: center; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div
 style="border-bottom: 1px solid #111111; margin-bottom: -1px; ">
-Grand mean
+Sensitivity
+</div></th>
+<th colspan="2" data-quarto-table-cell-role="th"
+style="text-align: center; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div
+style="border-bottom: 1px solid #111111; margin-bottom: -1px; ">
+Specificity
+</div></th>
+<th colspan="2" data-quarto-table-cell-role="th"
+style="text-align: center; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div
+style="border-bottom: 1px solid #111111; margin-bottom: -1px; ">
+AUC
 </div></th>
 </tr>
 <tr>
@@ -749,134 +870,136 @@ data-quarto-table-cell-role="th">Method</th>
 <th style="text-align: left;"
 data-quarto-table-cell-role="th">Version</th>
 <th style="text-align: right;"
-data-quarto-table-cell-role="th">Accuracy</th>
+data-quarto-table-cell-role="th">Training</th>
 <th style="text-align: right;"
-data-quarto-table-cell-role="th">Sensitivity</th>
+data-quarto-table-cell-role="th">Test</th>
 <th style="text-align: right;"
-data-quarto-table-cell-role="th">Specificity</th>
-<th style="text-align: right;" data-quarto-table-cell-role="th">AUC</th>
+data-quarto-table-cell-role="th">Training</th>
 <th style="text-align: right;"
-data-quarto-table-cell-role="th">Accuracy</th>
+data-quarto-table-cell-role="th">Test</th>
 <th style="text-align: right;"
-data-quarto-table-cell-role="th">Sensitivity</th>
+data-quarto-table-cell-role="th">Training</th>
 <th style="text-align: right;"
-data-quarto-table-cell-role="th">Specificity</th>
-<th style="text-align: right;" data-quarto-table-cell-role="th">AUC</th>
+data-quarto-table-cell-role="th">Test</th>
+<th style="text-align: right;"
+data-quarto-table-cell-role="th">Training</th>
+<th style="text-align: right;"
+data-quarto-table-cell-role="th">Test</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td style="text-align: left;">Logistic</td>
-<td style="text-align: left;">NA</td>
+<td style="text-align: left;"></td>
+<td style="text-align: right;">0.828</td>
 <td style="text-align: right;">0.819</td>
+<td style="text-align: right;">0.814</td>
 <td style="text-align: right;">0.817</td>
+<td style="text-align: right;">0.838</td>
 <td style="text-align: right;">0.827</td>
+<td style="text-align: right;">0.906</td>
 <td style="text-align: right;">0.895</td>
-<td style="text-align: right;">0.797</td>
-<td style="text-align: right;">0.793</td>
-<td style="text-align: right;">0.805</td>
-<td style="text-align: right;">0.880</td>
 </tr>
 <tr>
 <td style="text-align: left;">$GAM_1$</td>
 <td style="text-align: left;">5 knots</td>
+<td style="text-align: right;">0.858</td>
 <td style="text-align: right;">0.813</td>
+<td style="text-align: right;">0.823</td>
 <td style="text-align: right;">0.779</td>
+<td style="text-align: right;">0.886</td>
 <td style="text-align: right;">0.846</td>
+<td style="text-align: right;">0.931</td>
 <td style="text-align: right;">0.901</td>
-<td style="text-align: right;">0.804</td>
-<td style="text-align: right;">0.771</td>
-<td style="text-align: right;">0.836</td>
-<td style="text-align: right;">0.885</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
 <td style="text-align: left;">8 knots</td>
+<td style="text-align: right;">0.863</td>
 <td style="text-align: right;">0.812</td>
+<td style="text-align: right;">0.824</td>
 <td style="text-align: right;">0.779</td>
+<td style="text-align: right;">0.895</td>
 <td style="text-align: right;">0.845</td>
+<td style="text-align: right;">0.937</td>
 <td style="text-align: right;">0.898</td>
-<td style="text-align: right;">0.802</td>
-<td style="text-align: right;">0.767</td>
-<td style="text-align: right;">0.834</td>
-<td style="text-align: right;">0.883</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
 <td style="text-align: left;">10 knots</td>
+<td style="text-align: right;">0.863</td>
 <td style="text-align: right;">0.812</td>
+<td style="text-align: right;">0.824</td>
 <td style="text-align: right;">0.779</td>
+<td style="text-align: right;">0.895</td>
 <td style="text-align: right;">0.845</td>
+<td style="text-align: right;">0.937</td>
 <td style="text-align: right;">0.897</td>
-<td style="text-align: right;">0.802</td>
-<td style="text-align: right;">0.770</td>
-<td style="text-align: right;">0.832</td>
-<td style="text-align: right;">0.882</td>
 </tr>
 <tr>
 <td style="text-align: left;">$GAM_2$</td>
 <td style="text-align: left;">4 knots</td>
+<td style="text-align: right;">0.870</td>
 <td style="text-align: right;">0.808</td>
+<td style="text-align: right;">0.829</td>
 <td style="text-align: right;">0.763</td>
+<td style="text-align: right;">0.903</td>
 <td style="text-align: right;">0.850</td>
+<td style="text-align: right;">0.942</td>
 <td style="text-align: right;">0.888</td>
-<td style="text-align: right;">0.787</td>
-<td style="text-align: right;">0.740</td>
-<td style="text-align: right;">0.830</td>
-<td style="text-align: right;">0.861</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
 <td style="text-align: left;">5 knots</td>
+<td style="text-align: right;">0.872</td>
 <td style="text-align: right;">0.805</td>
+<td style="text-align: right;">0.832</td>
 <td style="text-align: right;">0.761</td>
+<td style="text-align: right;">0.904</td>
 <td style="text-align: right;">0.845</td>
+<td style="text-align: right;">0.943</td>
 <td style="text-align: right;">0.884</td>
-<td style="text-align: right;">0.786</td>
-<td style="text-align: right;">0.736</td>
-<td style="text-align: right;">0.831</td>
-<td style="text-align: right;">0.858</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
 <td style="text-align: left;">6 knots</td>
+<td style="text-align: right;">0.875</td>
 <td style="text-align: right;">0.803</td>
+<td style="text-align: right;">0.830</td>
 <td style="text-align: right;">0.766</td>
+<td style="text-align: right;">0.911</td>
 <td style="text-align: right;">0.838</td>
+<td style="text-align: right;">0.946</td>
 <td style="text-align: right;">0.876</td>
-<td style="text-align: right;">0.778</td>
-<td style="text-align: right;">0.735</td>
-<td style="text-align: right;">0.818</td>
-<td style="text-align: right;">0.851</td>
 </tr>
 <tr>
 <td style="text-align: left;">SVM</td>
 <td style="text-align: left;">Linear basis</td>
+<td style="text-align: right;">0.829</td>
 <td style="text-align: right;">0.822</td>
+<td style="text-align: right;">0.818</td>
 <td style="text-align: right;">0.819</td>
+<td style="text-align: right;">0.837</td>
 <td style="text-align: right;">0.830</td>
+<td style="text-align: right;">0.903</td>
 <td style="text-align: right;">0.895</td>
-<td style="text-align: right;">0.802</td>
-<td style="text-align: right;">0.800</td>
-<td style="text-align: right;">0.807</td>
-<td style="text-align: right;">0.879</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
 <td style="text-align: left;">Radial basis</td>
+<td style="text-align: right;">0.854</td>
 <td style="text-align: right;">0.791</td>
+<td style="text-align: right;">0.815</td>
 <td style="text-align: right;">0.765</td>
+<td style="text-align: right;">0.885</td>
 <td style="text-align: right;">0.817</td>
+<td style="text-align: right;">0.930</td>
 <td style="text-align: right;">0.880</td>
-<td style="text-align: right;">0.799</td>
-<td style="text-align: right;">0.772</td>
-<td style="text-align: right;">0.826</td>
-<td style="text-align: right;">0.864</td>
 </tr>
 </tbody><tfoot>
 <tr>
 <td style="text-align: left; padding: 0; border: 0;"><sup></sup>
-Standard errors lie in [ 0.005 , 0.013 ]</td>
+Standard errors lie in [0.001,0.013].</td>
 <td style="text-align: left;"></td>
 <td style="text-align: right;"></td>
 <td style="text-align: right;"></td>
@@ -889,7 +1012,8 @@ Standard errors lie in [ 0.005 , 0.013 ]</td>
 </tr>
 <tr>
 <td style="text-align: left; padding: 0; border: 0;"><sup></sup> $GAM_1$
-and $GAM_2$ use univariate and bivariate smooth terms, respectively</td>
+and $GAM_2$ use univariate and bivariate smooth terms,
+respectively.</td>
 <td style="text-align: left;"></td>
 <td style="text-align: right;"></td>
 <td style="text-align: right;"></td>
@@ -903,12 +1027,11 @@ and $GAM_2$ use univariate and bivariate smooth terms, respectively</td>
 </tfoot>
 &#10;</table>
 
-## Table S1
+### Table S1
 
 ``` r
 n_iter<-100
-rpeso_sum<-rpeso%>%
-  dplyr::select(c(4,1:3,5,7,9,11,13,15,17,19)) %>%
+rpeso_sum<-rpeso_s1%>%
   mutate(Version=ifelse(is.na(Variants),0,
                         ifelse(Variants=="5 knots" &
                                  Method=="$GAM_1$",1,
@@ -927,7 +1050,7 @@ mxse1<-max(as.matrix(sd_ts_dat))
 ```
 
 ``` r
-rpeso_sum %>%
+TableS1<-rpeso_sum %>%
   dplyr::select(-Subjects,-Version,-Variants) %>%
   mutate(Accuracy=paste(Ts_Accuracy_mean_1,"(",Ts_Accuracy_sd_1,")",sep=""),
          Sensitivity=paste(Ts_Sensitivity_mean_1,"(",Ts_Sensitivity_sd_1,")",sep=""),
@@ -946,11 +1069,21 @@ rpeso_sum %>%
   group_by(Measures) %>%
   mutate(Measures=replace(Measures,duplicated(Measures),"")) %>%
   ungroup() %>%
-  dplyr::select(c(1,2,5,6,7,3,4)) %>%
+  dplyr::select(c(1,2,5,6,7,3,4)) 
+
+TableS1 %>%
+  kableExtra::kbl(col.names = c("Measures","Method","$5\\times 5$","$7\\times 7$","$9\\times 9$","$12\\times 12$","$16\\times 16$") ,escape = FALSE,format="latex",booktabs = TRUE,align = c("l","r",rep("c",5)),linesep = "",digits = 3,caption = "Accuracy, sensitivity, specificity and AUC observed for PESO data using the proposed approach with different classifiers in the case of test data ($40$ patches from $10$ subjects) when Q functions were obtained at various grids. Values within parenthesis represent corresponding standard errors.",label="peso_grid") %>%
+  kableExtra::kable_classic_2() %>%
+  kableExtra::kable_styling(latex_options = "scale_down") %>%
+  kableExtra::footnote(general=c(paste("$GAM_1$ and $GAM_2$ use univariate and bivariate smooth terms, respectively")),escape = FALSE,threeparttable = TRUE,footnote_as_chunk = TRUE,general_title = "") %>%
+  kableExtra::add_header_above(c("","","Grid size"=5),escape=FALSE) %>%
+    kableExtra::save_kable("Tables/TableS1.tex")
+
+TableS1 %>%
   kableExtra::kbl(col.names = c("Measures","Method","$5\\times 5$","$7\\times 7$","$9\\times 9$","$12\\times 12$","$16\\times 16$") ,escape = FALSE,booktabs = TRUE,align = c("l","r",rep("c",5)),linesep = "",digits = 3,caption = "Accuracy, sensitivity, specificity and AUC observed for PESO data using the proposed approach with different classifiers in the case of test data ($40$ patches from $10$ subjects) when Q functions were obtained at various grids. Values within parenthesis represent corresponding standard errors.",label="peso_grid") %>%
   kableExtra::kable_classic_2() %>%
   kableExtra::kable_styling(latex_options = "scale_down") %>%
-  kableExtra::footnote(general=c(paste("GAM and GAM$^{\\\\ast}$ use univariate and bivariate smooth terms, respectively")),escape = FALSE,threeparttable = TRUE,footnote_as_chunk = TRUE,general_title = "") %>%
+  kableExtra::footnote(general=c(paste("$GAM_1$ and $GAM_2$ use univariate and bivariate smooth terms, respectively")),escape = FALSE,threeparttable = TRUE,footnote_as_chunk = TRUE,general_title = "") %>%
   kableExtra::add_header_above(c("","","Grid size"=5),escape=FALSE)
 ```
 
@@ -1146,9 +1279,8 @@ data-quarto-table-cell-role="th">$16\times 16$</th>
 </tr>
 </tbody><tfoot>
 <tr>
-<td style="text-align: left; padding: 0;"><sup></sup> GAM and
-GAM$^{\\ast}$ use univariate and bivariate smooth terms,
-respectively</td>
+<td style="text-align: left; padding: 0;"><sup></sup> $GAM_1$ and
+$GAM_2$ use univariate and bivariate smooth terms, respectively</td>
 <td style="text-align: right;"></td>
 <td style="text-align: center;"></td>
 <td style="text-align: center;"></td>
@@ -1159,6 +1291,8 @@ respectively</td>
 </tfoot>
 &#10;</table>
 
+# Simulation Study Results
+
 ## Table 3
 
 - (Table 3 — data assembly) We load simulation outputs for the logistic
@@ -1168,16 +1302,31 @@ respectively</td>
 
 ``` r
 Nsim<-100
-dirP<-paste(sim_res_dir,"HSR_NOV0823/HPImage/",sep="")
+dirP<-paste(sim_res_dir,"HSR_NOV1625/",sep="")
 fname<-list.files(dirP)
 res_dat<-do.call(rbind,lapply(fname, function(u){
-  dat<-read.table(paste(dirP,u,sep=""))
-  dat %>%
-    mutate(n=as.numeric(paste(strsplit(u,"")[[1]][sapply(strsplit(u,"")[[1]],function(v){any(0:9==v)})],collapse = ''))) %>%
-    group_by(V9) %>%
-    summarise_if(is.numeric,c("mean","sd")) %>%
-    ungroup() %>%
-    mutate(Type=substr(u,2,2))
+  dat<-read.table(paste(dirP,u,sep="")) %>%
+    set_names(c(do.call(c,lapply(c("Tr_","Ts_"),function(j){paste(j,c("Accuracy","Sensitivity","Specificity","AUC"),sep="")})),"Variants","Method","Iter","Corr_Type","Comp_Time")) %>%
+    mutate(n=2*as.numeric(str_split(u,"_",simplify = TRUE)[,3]),
+           Type=str_sub(str_split(u,"_",simplify = TRUE)[,1],2,2)) %>%
+    mutate(Method=factor(recode(Method,
+                                "1"="Logistic",
+                                "2"="GAM",
+                                "3"="SVM"),levels=c("Logistic","GAM","SVM")),
+           Corr_Type=factor(recode(Corr_Type,
+                                   "1"="Spherical",
+                                   "2"="Gaussian",
+                                   "3"="Exponential"),levels=c("Spherical","Gaussian","Exponential")),
+           Variants=factor(recode(Variants,
+                                  "5"="5-knots",
+                                  "8"="8-knots",
+                                  "10"="10-knots",
+                                  "1"="Linear",
+                                  "2"="Radial"),levels=c("5-knots",
+                                                         "8-knots",
+                                                         "10-knots",
+                                                         "Linear",
+                                                         "Radial")))
 }))
 ```
 
@@ -1187,36 +1336,62 @@ res_dat<-do.call(rbind,lapply(fname, function(u){
   caption and footnote showing the range of Monte Carlo standard errors.
 
 ``` r
-res_dat %>%
-  mutate(Correlation=recode(V9,
-                            "1"="Spherical",
-                            "2"="Gaussian",
-                            "3"="Exponential")) %>%
-  dplyr::select(Correlation,n_mean,Type,V5_mean,V5_sd,V6_mean,V6_sd,V7_mean,V7_sd,V8_mean,V8_sd) %>%
-  mutate("Accuracy"=V5_mean,
-         "Sensitivity"=V6_mean,
-         "Specificity"=V7_mean,
-         "AUC"=V8_mean) %>%
-  dplyr::select(Correlation,n_mean,Type,Accuracy,Sensitivity,Specificity,AUC) %>%
-  pivot_wider(id_cols = c("Correlation","n_mean"),
+sd_logis_rng<-res_dat %>%
+  dplyr::select(-Iter) %>%
+  group_by(Type,Corr_Type,Method,Variants,n) %>%
+  summarise_all(c("mean","sd")) %>%
+  ungroup() %>%
+  filter(Method=="Logistic") %>%
+  dplyr::select(starts_with("Ts_")) %>%
+  dplyr::select(ends_with("_sd")) %>%
+  as.matrix() %>%
+  as.numeric() %>%
+  range()
+```
+
+``` r
+Table3<-res_dat %>%
+  dplyr::select(-Iter) %>%
+  group_by(Type,Corr_Type,Method,Variants,n) %>%
+  summarise_all(c("mean","sd")) %>%
+  ungroup() %>%
+  filter(Method=="Logistic") %>%
+  dplyr::select(Corr_Type,Type,n,starts_with("Ts_")) %>%
+  dplyr::select(Corr_Type,Type,n,ends_with("_mean")) %>%
+  set_names(c("Correlation","Type","n","Accuracy","Sensitivity","Specificity","AUC")) %>%
+  pivot_wider(id_cols = c("Correlation","n"),
               names_from = Type,
               values_from = c("Accuracy","Sensitivity","Specificity","AUC")) %>%
-    arrange(desc(Correlation),n_mean) %>%
-  dplyr::select(Correlation,n_mean,Accuracy_p,Sensitivity_p,Specificity_p,AUC_p,Accuracy_i,Sensitivity_i,Specificity_i,AUC_i) %>%
-  mutate(Correlation=replace(Correlation,duplicated(Correlation),""),
-         n_mean=2*n_mean) %>%
+  arrange(Correlation,n) %>%
+  dplyr::select(Correlation,n,ends_with("_p"),ends_with("_i")) %>%
+  mutate(Correlation=replace(Correlation,duplicated(Correlation)," "))  
+```
+
+``` r
+Table3 %>%
   kableExtra::kbl(digits = 3,
-                    col.names=c("Correlation","n",rep(c("Accuracy", "Sensitivity","Specificity","AUC"),2)),
-                    caption = "Accuracy, sensitivity, specificity and AUC  on test data using a logistic classifier.") %>%
+                  col.names=c("Correlation","n",rep(c("Accuracy", "Sensitivity","Specificity","AUC"),2)),
+                  caption = "Test-set accuracy, sensitivity, and specificity when spherical correlation differs between groups and the number of patches in the training set, $m_i$, is fixed ($4$) or random ($5$–$10$). Results are based on 100 MC simulations.",label = "sim_res_logis",escape = FALSE,booktabs = TRUE,linesep = "",format="latex") %>%
   kableExtra::kable_classic_2() %>%
   kableExtra::add_header_above(c("","","$m_i=4$"=4,"$m_i\\sim\\{5,6,\\ldots,10\\} $"=4),escape = F) %>%
-  kableExtra::add_footnote(paste("Maximum standard errors lie in [",round(min(res_dat[,15:18])/sqrt(Nsim),3),",",round(max(res_dat[,15:18])/sqrt(Nsim),3),"]"),notation = "none")
+  kableExtra::add_footnote(paste("Standard errors lie in [",round(sd_logis_rng[1]/sqrt(Nsim),3),",",round(sd_logis_rng[2]/sqrt(Nsim),3),"].",sep=""),notation = "none") %>%
+  kableExtra::save_kable("Tables/Table3.tex")
+
+Table3 %>%
+  kableExtra::kbl(digits = 3,
+                  col.names=c("Correlation","n",rep(c("Accuracy", "Sensitivity","Specificity","AUC"),2)),
+                  caption = "Test-set accuracy, sensitivity, and specificity when spherical correlation differs between groups and the number of patches in the training set, $m_i$, is fixed ($4$) or random ($5$–$10$). Results are based on 100 MC simulations.",label = "sim_res_logis",escape = FALSE,booktabs = TRUE,linesep = "") %>%
+  kableExtra::kable_classic_2() %>%
+  kableExtra::add_header_above(c("","","$m_i=4$"=4,"$m_i\\sim\\{5,6,\\ldots,10\\} $"=4),escape = F) %>%
+  kableExtra::add_footnote(paste("Standard errors lie in [",round(sd_logis_rng[1]/sqrt(Nsim),3),",",round(sd_logis_rng[2]/sqrt(Nsim),3),"].",sep=""),notation = "none")
 ```
 
 <table class="lightable-classic-2" data-quarto-postprocess="true"
 style="font-family: &quot;Arial Narrow&quot;, &quot;Source Sans Pro&quot;, sans-serif; margin-left: auto; margin-right: auto;">
-<caption>Accuracy, sensitivity, specificity and AUC on test data using a
-logistic classifier.</caption>
+<caption>Test-set accuracy, sensitivity, and specificity when spherical
+correlation differs between groups and the number of patches in the
+training set, $m_i$, is fixed ($4$) or random ($5$–$10$). Results are
+based on 100 MC simulations.</caption>
 <colgroup>
 <col style="width: 10%" />
 <col style="width: 10%" />
@@ -1270,259 +1445,259 @@ data-quarto-table-cell-role="th">Specificity</th>
 <tr>
 <td style="text-align: left;">Spherical</td>
 <td style="text-align: right;">6</td>
-<td style="text-align: right;">0.774</td>
-<td style="text-align: right;">0.732</td>
-<td style="text-align: right;">0.820</td>
+<td style="text-align: right;">0.790</td>
+<td style="text-align: right;">0.747</td>
 <td style="text-align: right;">0.828</td>
-<td style="text-align: right;">0.819</td>
-<td style="text-align: right;">0.798</td>
-<td style="text-align: right;">0.839</td>
-<td style="text-align: right;">0.886</td>
-</tr>
-<tr>
-<td style="text-align: left;"></td>
-<td style="text-align: right;">8</td>
-<td style="text-align: right;">0.799</td>
-<td style="text-align: right;">0.768</td>
-<td style="text-align: right;">0.833</td>
-<td style="text-align: right;">0.853</td>
-<td style="text-align: right;">0.838</td>
-<td style="text-align: right;">0.828</td>
-<td style="text-align: right;">0.847</td>
-<td style="text-align: right;">0.916</td>
-</tr>
-<tr>
-<td style="text-align: left;"></td>
-<td style="text-align: right;">10</td>
-<td style="text-align: right;">0.813</td>
-<td style="text-align: right;">0.777</td>
-<td style="text-align: right;">0.850</td>
-<td style="text-align: right;">0.876</td>
-<td style="text-align: right;">0.838</td>
-<td style="text-align: right;">0.832</td>
-<td style="text-align: right;">0.845</td>
-<td style="text-align: right;">0.919</td>
-</tr>
-<tr>
-<td style="text-align: left;"></td>
-<td style="text-align: right;">20</td>
-<td style="text-align: right;">0.848</td>
-<td style="text-align: right;">0.826</td>
-<td style="text-align: right;">0.871</td>
-<td style="text-align: right;">0.922</td>
-<td style="text-align: right;">0.850</td>
-<td style="text-align: right;">0.850</td>
-<td style="text-align: right;">0.850</td>
-<td style="text-align: right;">0.930</td>
-</tr>
-<tr>
-<td style="text-align: left;"></td>
-<td style="text-align: right;">30</td>
-<td style="text-align: right;">0.853</td>
-<td style="text-align: right;">0.836</td>
-<td style="text-align: right;">0.869</td>
-<td style="text-align: right;">0.930</td>
-<td style="text-align: right;">0.858</td>
-<td style="text-align: right;">0.868</td>
-<td style="text-align: right;">0.848</td>
-<td style="text-align: right;">0.933</td>
-</tr>
-<tr>
-<td style="text-align: left;"></td>
-<td style="text-align: right;">50</td>
-<td style="text-align: right;">0.858</td>
-<td style="text-align: right;">0.845</td>
-<td style="text-align: right;">0.871</td>
-<td style="text-align: right;">0.934</td>
-<td style="text-align: right;">0.861</td>
-<td style="text-align: right;">0.868</td>
-<td style="text-align: right;">0.855</td>
-<td style="text-align: right;">0.938</td>
-</tr>
-<tr>
-<td style="text-align: left;"></td>
-<td style="text-align: right;">100</td>
-<td style="text-align: right;">0.861</td>
-<td style="text-align: right;">0.855</td>
-<td style="text-align: right;">0.867</td>
-<td style="text-align: right;">0.937</td>
-<td style="text-align: right;">0.869</td>
-<td style="text-align: right;">0.869</td>
-<td style="text-align: right;">0.866</td>
-<td style="text-align: right;">0.940</td>
-</tr>
-<tr>
-<td style="text-align: left;">Gaussian</td>
-<td style="text-align: right;">6</td>
-<td style="text-align: right;">0.770</td>
-<td style="text-align: right;">0.729</td>
-<td style="text-align: right;">0.815</td>
-<td style="text-align: right;">0.823</td>
-<td style="text-align: right;">0.821</td>
-<td style="text-align: right;">0.796</td>
-<td style="text-align: right;">0.845</td>
-<td style="text-align: right;">0.886</td>
-</tr>
-<tr>
-<td style="text-align: left;"></td>
-<td style="text-align: right;">8</td>
-<td style="text-align: right;">0.798</td>
-<td style="text-align: right;">0.770</td>
-<td style="text-align: right;">0.827</td>
-<td style="text-align: right;">0.851</td>
-<td style="text-align: right;">0.828</td>
-<td style="text-align: right;">0.802</td>
-<td style="text-align: right;">0.852</td>
-<td style="text-align: right;">0.908</td>
-</tr>
-<tr>
-<td style="text-align: left;"></td>
-<td style="text-align: right;">10</td>
-<td style="text-align: right;">0.814</td>
-<td style="text-align: right;">0.773</td>
-<td style="text-align: right;">0.854</td>
-<td style="text-align: right;">0.873</td>
-<td style="text-align: right;">0.841</td>
-<td style="text-align: right;">0.833</td>
-<td style="text-align: right;">0.849</td>
-<td style="text-align: right;">0.918</td>
-</tr>
-<tr>
-<td style="text-align: left;"></td>
-<td style="text-align: right;">20</td>
-<td style="text-align: right;">0.843</td>
-<td style="text-align: right;">0.812</td>
-<td style="text-align: right;">0.875</td>
-<td style="text-align: right;">0.917</td>
-<td style="text-align: right;">0.853</td>
-<td style="text-align: right;">0.854</td>
-<td style="text-align: right;">0.851</td>
-<td style="text-align: right;">0.931</td>
-</tr>
-<tr>
-<td style="text-align: left;"></td>
-<td style="text-align: right;">30</td>
-<td style="text-align: right;">0.853</td>
-<td style="text-align: right;">0.833</td>
-<td style="text-align: right;">0.873</td>
-<td style="text-align: right;">0.928</td>
-<td style="text-align: right;">0.857</td>
-<td style="text-align: right;">0.862</td>
-<td style="text-align: right;">0.851</td>
-<td style="text-align: right;">0.931</td>
-</tr>
-<tr>
-<td style="text-align: left;"></td>
-<td style="text-align: right;">50</td>
-<td style="text-align: right;">0.856</td>
-<td style="text-align: right;">0.839</td>
-<td style="text-align: right;">0.873</td>
-<td style="text-align: right;">0.933</td>
-<td style="text-align: right;">0.857</td>
-<td style="text-align: right;">0.857</td>
-<td style="text-align: right;">0.858</td>
-<td style="text-align: right;">0.936</td>
-</tr>
-<tr>
-<td style="text-align: left;"></td>
-<td style="text-align: right;">100</td>
-<td style="text-align: right;">0.858</td>
-<td style="text-align: right;">0.842</td>
-<td style="text-align: right;">0.874</td>
-<td style="text-align: right;">0.933</td>
-<td style="text-align: right;">0.869</td>
-<td style="text-align: right;">0.870</td>
-<td style="text-align: right;">0.866</td>
-<td style="text-align: right;">0.939</td>
-</tr>
-<tr>
-<td style="text-align: left;">Exponential</td>
-<td style="text-align: right;">6</td>
-<td style="text-align: right;">0.771</td>
-<td style="text-align: right;">0.711</td>
-<td style="text-align: right;">0.831</td>
-<td style="text-align: right;">0.821</td>
-<td style="text-align: right;">0.817</td>
-<td style="text-align: right;">0.788</td>
-<td style="text-align: right;">0.846</td>
-<td style="text-align: right;">0.882</td>
-</tr>
-<tr>
-<td style="text-align: left;"></td>
-<td style="text-align: right;">8</td>
-<td style="text-align: right;">0.792</td>
-<td style="text-align: right;">0.746</td>
-<td style="text-align: right;">0.837</td>
-<td style="text-align: right;">0.840</td>
 <td style="text-align: right;">0.835</td>
-<td style="text-align: right;">0.814</td>
+<td style="text-align: right;">0.803</td>
+<td style="text-align: right;">0.783</td>
+<td style="text-align: right;">0.824</td>
+<td style="text-align: right;">0.878</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">0.801</td>
+<td style="text-align: right;">0.768</td>
+<td style="text-align: right;">0.835</td>
 <td style="text-align: right;">0.857</td>
+<td style="text-align: right;">0.819</td>
+<td style="text-align: right;">0.812</td>
+<td style="text-align: right;">0.827</td>
+<td style="text-align: right;">0.899</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.815</td>
+<td style="text-align: right;">0.786</td>
+<td style="text-align: right;">0.844</td>
+<td style="text-align: right;">0.884</td>
+<td style="text-align: right;">0.828</td>
+<td style="text-align: right;">0.823</td>
+<td style="text-align: right;">0.831</td>
 <td style="text-align: right;">0.910</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
-<td style="text-align: right;">10</td>
-<td style="text-align: right;">0.808</td>
-<td style="text-align: right;">0.763</td>
-<td style="text-align: right;">0.852</td>
-<td style="text-align: right;">0.870</td>
+<td style="text-align: right;">20</td>
+<td style="text-align: right;">0.840</td>
+<td style="text-align: right;">0.818</td>
+<td style="text-align: right;">0.862</td>
+<td style="text-align: right;">0.918</td>
+<td style="text-align: right;">0.838</td>
+<td style="text-align: right;">0.849</td>
 <td style="text-align: right;">0.828</td>
-<td style="text-align: right;">0.803</td>
-<td style="text-align: right;">0.855</td>
-<td style="text-align: right;">0.906</td>
+<td style="text-align: right;">0.919</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;">30</td>
+<td style="text-align: right;">0.842</td>
+<td style="text-align: right;">0.828</td>
+<td style="text-align: right;">0.857</td>
+<td style="text-align: right;">0.920</td>
+<td style="text-align: right;">0.846</td>
+<td style="text-align: right;">0.865</td>
+<td style="text-align: right;">0.829</td>
+<td style="text-align: right;">0.925</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;">50</td>
+<td style="text-align: right;">0.853</td>
+<td style="text-align: right;">0.845</td>
+<td style="text-align: right;">0.862</td>
+<td style="text-align: right;">0.929</td>
+<td style="text-align: right;">0.850</td>
+<td style="text-align: right;">0.863</td>
+<td style="text-align: right;">0.837</td>
+<td style="text-align: right;">0.930</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;">100</td>
+<td style="text-align: right;">0.852</td>
+<td style="text-align: right;">0.845</td>
+<td style="text-align: right;">0.860</td>
+<td style="text-align: right;">0.929</td>
+<td style="text-align: right;">0.859</td>
+<td style="text-align: right;">0.875</td>
+<td style="text-align: right;">0.842</td>
+<td style="text-align: right;">0.933</td>
+</tr>
+<tr>
+<td style="text-align: left;">Gaussian</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">0.794</td>
+<td style="text-align: right;">0.757</td>
+<td style="text-align: right;">0.828</td>
+<td style="text-align: right;">0.837</td>
+<td style="text-align: right;">0.804</td>
+<td style="text-align: right;">0.784</td>
+<td style="text-align: right;">0.824</td>
+<td style="text-align: right;">0.876</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">0.798</td>
+<td style="text-align: right;">0.766</td>
+<td style="text-align: right;">0.834</td>
+<td style="text-align: right;">0.854</td>
+<td style="text-align: right;">0.818</td>
+<td style="text-align: right;">0.812</td>
+<td style="text-align: right;">0.826</td>
+<td style="text-align: right;">0.900</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.817</td>
+<td style="text-align: right;">0.790</td>
+<td style="text-align: right;">0.844</td>
+<td style="text-align: right;">0.885</td>
+<td style="text-align: right;">0.830</td>
+<td style="text-align: right;">0.826</td>
+<td style="text-align: right;">0.833</td>
+<td style="text-align: right;">0.911</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
 <td style="text-align: right;">20</td>
 <td style="text-align: right;">0.839</td>
-<td style="text-align: right;">0.801</td>
-<td style="text-align: right;">0.877</td>
-<td style="text-align: right;">0.915</td>
-<td style="text-align: right;">0.850</td>
-<td style="text-align: right;">0.844</td>
-<td style="text-align: right;">0.855</td>
-<td style="text-align: right;">0.929</td>
+<td style="text-align: right;">0.817</td>
+<td style="text-align: right;">0.860</td>
+<td style="text-align: right;">0.917</td>
+<td style="text-align: right;">0.838</td>
+<td style="text-align: right;">0.847</td>
+<td style="text-align: right;">0.828</td>
+<td style="text-align: right;">0.919</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
 <td style="text-align: right;">30</td>
-<td style="text-align: right;">0.850</td>
-<td style="text-align: right;">0.829</td>
-<td style="text-align: right;">0.871</td>
+<td style="text-align: right;">0.843</td>
+<td style="text-align: right;">0.830</td>
+<td style="text-align: right;">0.857</td>
+<td style="text-align: right;">0.921</td>
+<td style="text-align: right;">0.846</td>
+<td style="text-align: right;">0.866</td>
+<td style="text-align: right;">0.828</td>
 <td style="text-align: right;">0.926</td>
-<td style="text-align: right;">0.853</td>
-<td style="text-align: right;">0.853</td>
-<td style="text-align: right;">0.853</td>
-<td style="text-align: right;">0.929</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
 <td style="text-align: right;">50</td>
 <td style="text-align: right;">0.854</td>
-<td style="text-align: right;">0.836</td>
-<td style="text-align: right;">0.873</td>
+<td style="text-align: right;">0.845</td>
+<td style="text-align: right;">0.862</td>
 <td style="text-align: right;">0.930</td>
-<td style="text-align: right;">0.857</td>
-<td style="text-align: right;">0.855</td>
-<td style="text-align: right;">0.858</td>
-<td style="text-align: right;">0.935</td>
+<td style="text-align: right;">0.850</td>
+<td style="text-align: right;">0.863</td>
+<td style="text-align: right;">0.837</td>
+<td style="text-align: right;">0.930</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
 <td style="text-align: right;">100</td>
-<td style="text-align: right;">0.858</td>
-<td style="text-align: right;">0.845</td>
-<td style="text-align: right;">0.872</td>
-<td style="text-align: right;">0.933</td>
-<td style="text-align: right;">0.866</td>
+<td style="text-align: right;">0.853</td>
+<td style="text-align: right;">0.846</td>
 <td style="text-align: right;">0.860</td>
-<td style="text-align: right;">0.871</td>
-<td style="text-align: right;">0.936</td>
+<td style="text-align: right;">0.929</td>
+<td style="text-align: right;">0.859</td>
+<td style="text-align: right;">0.874</td>
+<td style="text-align: right;">0.842</td>
+<td style="text-align: right;">0.934</td>
+</tr>
+<tr>
+<td style="text-align: left;">Exponential</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">0.788</td>
+<td style="text-align: right;">0.739</td>
+<td style="text-align: right;">0.832</td>
+<td style="text-align: right;">0.837</td>
+<td style="text-align: right;">0.798</td>
+<td style="text-align: right;">0.773</td>
+<td style="text-align: right;">0.824</td>
+<td style="text-align: right;">0.872</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">0.797</td>
+<td style="text-align: right;">0.759</td>
+<td style="text-align: right;">0.837</td>
+<td style="text-align: right;">0.856</td>
+<td style="text-align: right;">0.818</td>
+<td style="text-align: right;">0.808</td>
+<td style="text-align: right;">0.831</td>
+<td style="text-align: right;">0.897</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.816</td>
+<td style="text-align: right;">0.789</td>
+<td style="text-align: right;">0.844</td>
+<td style="text-align: right;">0.884</td>
+<td style="text-align: right;">0.827</td>
+<td style="text-align: right;">0.816</td>
+<td style="text-align: right;">0.837</td>
+<td style="text-align: right;">0.909</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;">20</td>
+<td style="text-align: right;">0.840</td>
+<td style="text-align: right;">0.820</td>
+<td style="text-align: right;">0.858</td>
+<td style="text-align: right;">0.917</td>
+<td style="text-align: right;">0.837</td>
+<td style="text-align: right;">0.846</td>
+<td style="text-align: right;">0.828</td>
+<td style="text-align: right;">0.918</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;">30</td>
+<td style="text-align: right;">0.842</td>
+<td style="text-align: right;">0.833</td>
+<td style="text-align: right;">0.853</td>
+<td style="text-align: right;">0.919</td>
+<td style="text-align: right;">0.847</td>
+<td style="text-align: right;">0.865</td>
+<td style="text-align: right;">0.830</td>
+<td style="text-align: right;">0.924</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;">50</td>
+<td style="text-align: right;">0.854</td>
+<td style="text-align: right;">0.847</td>
+<td style="text-align: right;">0.862</td>
+<td style="text-align: right;">0.929</td>
+<td style="text-align: right;">0.850</td>
+<td style="text-align: right;">0.860</td>
+<td style="text-align: right;">0.840</td>
+<td style="text-align: right;">0.929</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;">100</td>
+<td style="text-align: right;">0.850</td>
+<td style="text-align: right;">0.846</td>
+<td style="text-align: right;">0.855</td>
+<td style="text-align: right;">0.928</td>
+<td style="text-align: right;">0.858</td>
+<td style="text-align: right;">0.874</td>
+<td style="text-align: right;">0.842</td>
+<td style="text-align: right;">0.933</td>
 </tr>
 </tbody><tfoot>
 <tr>
-<td style="text-align: left; padding: 0; border: 0;"><sup></sup> Maximum
-standard errors lie in [ 0.002 , 0.014 ]</td>
+<td style="text-align: left; padding: 0; border: 0;"><sup></sup>
+Standard errors lie in [0.003,0.011].</td>
 <td style="text-align: right;"></td>
 <td style="text-align: right;"></td>
 <td style="text-align: right;"></td>
@@ -1536,54 +1711,12 @@ standard errors lie in [ 0.002 , 0.014 ]</td>
 </tfoot>
 &#10;</table>
 
-``` r
-#paste(round(V4_mean,3),"(",round(V4_sd/sqrt(Nsim),2),")",sep = "")
-```
-
 ## Figure 4
 
 - (Figure 4 — data assembly) We gather and harmonize results from three
   model families—Logistic, GAM, and SVM—matching scenarios by filename.
   For GAM and SVM, we select the settings used in the paper (specified
   by `V9`/`V10`) and append method labels for joint plotting.
-
-``` r
-Nsim<-100
-dirPL<-"SimulationStudy_Results/HSR_NOV0823/HPImage/"
-fnameL<-list.files(dirPL)
-dirPG<-"SimulationStudy_Results/HSR_NOV1423/GAM/HPImage/"
-fnameG<-list.files(dirPG)
-dirPS<-"SimulationStudy_Results/HSR_NOV1423/SVM/HPImage/"
-fnameS<-list.files(dirPS)
-
-res_dat<-do.call(rbind,lapply(fnameL, function(u){
-  datL<-read.table(paste(dirPL,u,sep=""))
-  datG<-read.table(paste(dirPG,u,sep=""))
-  datS<-read.table(paste(dirPS,u,sep=""))
-  DatL<-datL %>%
-    mutate(n=as.numeric(paste(strsplit(u,"")[[1]][sapply(strsplit(u,"")[[1]],function(v){any(0:9==v)})],collapse = ''))) %>%
-    mutate(Type=substr(u,2,2),Method="Logistic")
-
-  DatG<-datG %>%
-    filter(V9==5) %>%
-    dplyr::select(-V9) %>%
-    mutate(V9=V10) %>%
-    dplyr::select(-V10) %>%
-    mutate(n=as.numeric(paste(strsplit(u,"")[[1]][sapply(strsplit(u,"")[[1]],function(v){any(0:9==v)})],collapse = ''))) %>%
-    mutate(Type=substr(u,2,2),Method="GAM")
-  DatS<-datS %>%
-    filter(V9==2) %>%
-    dplyr::select(-V9) %>%
-    mutate(V9=V10) %>%
-    dplyr::select(-V10) %>%
-    mutate(n=as.numeric(paste(strsplit(u,"")[[1]][sapply(strsplit(u,"")[[1]],function(v){any(0:9==v)})],collapse = ''))) %>%
-    mutate(Type=substr(u,2,2),Method="SVM")
-  DatL %>%
-    add_case(DatG) %>%
-    add_case(DatS) 
-  }
-))
-```
 
 - (Figure 4 — panel “i”) For the irregular sampling design (“i”), we
   recode correlation models and reshape metrics into a long format. We
@@ -1592,30 +1725,26 @@ res_dat<-do.call(rbind,lapply(fnameL, function(u){
 
 ``` r
 res_dat %>%
-  mutate(V9=factor(recode(V9,
-                   "1"="Spherical",
-                   "2"="Gaussian",
-                   "3"="Exponential"),labels = c("Spherical","Gaussian","Exponential")))  %>%
   filter(Type=="i") %>%
-  dplyr::select(-V1,-V2,-V3,-V4) %>%
-  pivot_longer(cols=V5:V8,values_to = "GOF",names_to = "Indices",names_prefix = "V") %>%
-  mutate(Indices=factor(recode(Indices,
-                   "5"="Accuracy",
-                   "6"="Sensitivity",
-                   "7"="Specificity",
-                   "8"="AUC"),labels = c("Accuracy","Sensitivity","Specificity","AUC"))) %>%
-  ggplot(aes(x=as.factor(2*n),y=GOF,group=interaction(n,Method),col=Method)) +
+  filter(!Variants%in%c("8-knots","10-knots","Linear")) %>%
+  dplyr::select(-Type,-Iter,-Variants,-starts_with("Tr_")) %>%
+  pivot_longer(cols=starts_with("Ts_"),values_to = "GOF",names_to = "Indices",names_prefix = "Ts_") %>%
+  mutate(Indices=factor(Indices,levels = c("Accuracy","Sensitivity","Specificity","AUC"))) %>%
+  ggplot(aes(x=as.factor(n),y=GOF,group=interaction(n,Method),col=Method)) +
   geom_boxplot(position = position_dodge(0.7))+
-  facet_grid(rows=vars(Indices),cols = vars(V9),labeller = label_parsed) +
+  facet_grid(rows=vars(Indices),cols = vars(Corr_Type),labeller = label_parsed) +
   ylab("")+
   xlab("n") +
-  theme(legend.title = element_blank(),legend.position = "top",legend.direction = "horizontal")
+  theme(legend.title = element_blank(),legend.position = "top",legend.direction = "horizontal")    
 ```
 
-![](README_files/figure-commonmark/unnamed-chunk-31-1.png)
+![Boxplot comparison of accuracy, sensitivity, specificity, and AUC for
+logistic regression, GAM (5 knots), and SVM (radial basis kernel) across
+varying $n$ and $m_i \sim {5, \ldots, 10}$. Results based 100 MC
+replications.](README_files/figure-commonmark/unnamed-chunk-34-1.png)
 
 ``` r
-ggsave(filename = "Figures/Figure4.jpg",width = 30,height = 24,units = "cm",dpi=300)
+ggsave(filename = "Figures/Figure4.jpg",width = 8,height = 6,units = "in",dpi=300)
 ```
 
 ## Figure S1
@@ -1626,30 +1755,22 @@ ggsave(filename = "Figures/Figure4.jpg",width = 30,height = 24,units = "cm",dpi=
 
 ``` r
 res_dat %>%
-  mutate(V9=factor(recode(V9,
-                   "1"="Spherical",
-                   "2"="Gaussian",
-                   "3"="Exponential"),labels = c("Spherical","Gaussian","Exponential")))  %>%
   filter(Type=="p") %>%
-  dplyr::select(-V1,-V2,-V3,-V4) %>%
-  pivot_longer(cols=V5:V8,values_to = "GOF",names_to = "Indices",names_prefix = "V") %>%
-  mutate(Indices=factor(recode(Indices,
-                   "5"="Accuracy",
-                   "6"="Sensitivity",
-                   "7"="Specificity",
-                   "8"="AUC"),labels = c("Accuracy","Sensitivity","Specificity","AUC"))) %>%
-  ggplot(aes(x=as.factor(2*n),y=GOF,group=interaction(n,Method),col=Method)) +
+  dplyr::select(-Type,-Iter,-Variants,-starts_with("Tr_")) %>%
+  pivot_longer(cols=starts_with("Ts_"),values_to = "GOF",names_to = "Indices",names_prefix = "Ts_") %>%
+  mutate(Indices=factor(Indices,levels = c("Accuracy","Sensitivity","Specificity","AUC"))) %>%
+  ggplot(aes(x=as.factor(n),y=GOF,group=interaction(n,Method),col=Method)) +
   geom_boxplot(position = position_dodge(0.7))+
-  facet_grid(rows=vars(Indices),cols = vars(V9),labeller = label_parsed) +
+  facet_grid(rows=vars(Indices),cols = vars(Corr_Type),labeller = label_parsed) +
   ylab("")+
   xlab("n") +
   theme(legend.title = element_blank(),legend.position = "top",legend.direction = "horizontal")
 ```
 
-![](README_files/figure-commonmark/unnamed-chunk-32-1.png)
+![](README_files/figure-commonmark/unnamed-chunk-35-1.png)
 
 ``` r
-ggsave(filename = "Figures/FigureS1.jpg",width = 30,height = 24,units = "cm",dpi=300)
+ggsave(filename = "Figures/FigureS1.jpg",width = 8,height = 6,units = "in",dpi=300)
 ```
 
 ## Figure S2
@@ -1660,97 +1781,20 @@ ggsave(filename = "Figures/FigureS1.jpg",width = 30,height = 24,units = "cm",dpi
   summaries.
 
 ``` r
-Nsim<-100
-dirP<-"SimulationStudy_Results/HSR_NOV1423/GAM/HPImage/"
-fname<-list.files(dirP)
-res_dat<-do.call(rbind,lapply(fname, function(u){
-  dat<-read.table(paste(dirP,u,sep=""))
-  dat %>%
-    mutate(n=as.numeric(paste(strsplit(u,"")[[1]][sapply(strsplit(u,"")[[1]],function(v){any(0:9==v)})],collapse = ''))) %>%
-    dplyr::select(-V1,-V2,-V3,-V4) %>%
-    group_by(V9,V10) %>%
-    summarise_if(is.numeric,c("mean","sd","length")) %>%
-    ungroup() %>%
-    mutate(Type=substr(u,2,2))
-}))
-```
-
-``` r
 res_dat %>%
-  dplyr::select(-n_sd,-n_length) %>%
-  pivot_longer(cols= -c("V9","V10","n_mean","Type"),
+  dplyr::select(-Iter) %>%
+  group_by(Type,Corr_Type,Method,Variants,n) %>%
+  summarise_all(c("mean")) %>%
+  ungroup() %>%
+  filter(Method=="GAM") %>%
+  dplyr::select(Type,Corr_Type,Variants,n,starts_with("Ts_")) %>%
+  pivot_longer(cols= starts_with("Ts_"),
                names_sep = "_",
-               names_to = c("names",".value")) %>%
-  set_names(c("Knots","Model","n","Mtype","Measure","mean","sd","length")) %>%
-  mutate(Knots=factor(recode(Knots,
-                      "5"="5-knots",
-                      "8"="8-knots",
-                      "10"="10-knots"),labels=c("5-knots","8-knots","10-knots")),
-         Model=factor(recode(Model,
-                      "1"="Spherical",
-                      "2"="Exponential",
-                      "3"="Gaussian"),labels=c("Spherical","Exponential","Gaussian")),
-         Measure=factor(recode(Measure,
-                        "V5"="Accuracy",
-                        "V6"="Sensitivity",
-                        "V7"="Specificity",
-                        "V8"="AUC"),labels=c("Accuracy","Sensitivity","Specificity","AUC"))) %>%
-    ggplot(aes(x=n,y=mean,group=interaction(Knots,Mtype),color=Knots)) +
-  geom_line(aes(linetype=Mtype)) +
-  #geom_ribbon(aes(ymin=mean-2*(sd/sqrt(length)),ymax=mean+2*(sd/sqrt(length)),linetype=Mtype),fill="gray80") +
-  facet_grid(rows = vars(Measure),cols = vars(Model),scales = "free_y",labeller = label_parsed) +
-  theme(legend.title = element_blank(),legend.position = "top") +
-  scale_linetype_manual(values=c("solid","dashed"),labels=c(expression(m[i]%~%"{5,6,...,10}"),expression(m[i]==4)))+
-  xlab("Sample size (n)") +
-  ylab("Average")
-```
-
-![](README_files/figure-commonmark/unnamed-chunk-34-1.png)
-
-``` r
-ggsave(filename = "Figures/FigureS2.jpeg",width = 30,height = 24,units = "cm",dpi=300)
-```
-
-## Figure S3
-
-``` r
-Nsim<-100
-dirP<-"SimulationStudy_Results/HSR_NOV1423/SVM/HPImage/"
-fname<-list.files(dirP)
-res_dat<-do.call(rbind,lapply(fname, function(u){
-  dat<-read.table(paste(dirP,u,sep=""))
-  dat %>%
-    mutate(n=as.numeric(paste(strsplit(u,"")[[1]][sapply(strsplit(u,"")[[1]],function(v){any(0:9==v)})],collapse = ''))) %>%
-    dplyr::select(-V1,-V2,-V3,-V4) %>%
-    group_by(V9,V10) %>%
-    summarise_if(is.numeric,c("mean","sd","length")) %>%
-    ungroup() %>%
-    mutate(Type=substr(u,2,2))
-}))
-```
-
-``` r
-res_dat %>%
-  dplyr::select(-n_sd,-n_length) %>%
-  pivot_longer(cols= -c("V9","V10","n_mean","Type"),
-               names_sep = "_",
-               names_to = c("names",".value")) %>%
-  set_names(c("Knots","Model","n","Mtype","Measure","mean","sd","length")) %>%
-  mutate(Knots=factor(recode(Knots,"1"="Linear","2"="Radial"),labels=c("Linear","Radial")),
-         Model=factor(recode(Model,
-                      "1"="Spherical",
-                      "2"="Exponential",
-                      "3"="Gaussian"),labels=c("Spherical","Exponential","Gaussian")),
-         Measure=factor(recode(Measure,
-                        "V5"="Accuracy",
-                        "V6"="Sensitivity",
-                        "V7"="Specificity",
-                        "V8"="AUC"),labels=c("Accuracy","Sensitivity","Specificity","AUC"))) %>%
-    ggplot(aes(x=n,y=mean,group=interaction(Knots,Mtype),color=Knots)) +
-  geom_line(aes(linetype=Mtype)) +
-#  geom_errorbar(aes(ymin=mean-2*(sd/sqrt(length)),ymax=mean+2*(sd/sqrt(length))),
-#                position=position_dodge(2)) +
-  facet_grid(rows = vars(Measure),cols = vars(Model),scales = "free_y",labeller = label_parsed) +
+               names_to = c(".value","Measure")) %>%
+  mutate(Measure=factor(Measure,levels = c("Accuracy","Sensitivity","Specificity","AUC"))) %>%
+  ggplot(aes(x=n,y=Ts,group=interaction(Variants,Type),color=Variants)) +
+  geom_line(aes(linetype=Type)) +
+  facet_grid(rows = vars(Measure),cols = vars(Corr_Type),scales = "free_y",labeller = label_parsed) +
   theme(legend.title = element_blank(),legend.position = "top") +
   scale_linetype_manual(values=c("solid","dashed"),labels=c(expression(m[i]%~%"{5,6,...,10}"),expression(m[i]==4)))+
   xlab("Sample size (n)") +
@@ -1758,6 +1802,35 @@ res_dat %>%
 ```
 
 ![](README_files/figure-commonmark/unnamed-chunk-36-1.png)
+
+``` r
+ggsave(filename = "Figures/FigureS2.jpg",width = 30,height = 24,units = "cm",dpi=300)
+```
+
+## Figure S3
+
+``` r
+res_dat %>%
+  dplyr::select(-Iter) %>%
+  group_by(Type,Corr_Type,Method,Variants,n) %>%
+  summarise_all(c("mean")) %>%
+  ungroup() %>%
+  filter(Method=="SVM") %>%
+  dplyr::select(Type,Corr_Type,Variants,n,starts_with("Ts_")) %>%
+  pivot_longer(cols= starts_with("Ts_"),
+               names_sep = "_",
+               names_to = c(".value","Measure")) %>%
+  mutate(Measure=factor(Measure,levels = c("Accuracy","Sensitivity","Specificity","AUC"))) %>%
+  ggplot(aes(x=n,y=Ts,group=interaction(Variants,Type),color=Variants)) +
+  geom_line(aes(linetype=Type)) +
+  facet_grid(rows = vars(Measure),cols = vars(Corr_Type),scales = "free_y",labeller = label_parsed) +
+  theme(legend.title = element_blank(),legend.position = "top") +
+  scale_linetype_manual(values=c("solid","dashed"),labels=c(expression(m[i]%~%"{5,6,...,10}"),expression(m[i]==4)))+
+  xlab("Sample size (n)") +
+  ylab("Average")
+```
+
+![](README_files/figure-commonmark/unnamed-chunk-37-1.png)
 
 ``` r
 ggsave(filename = "Figures/FigureS3.jpg",width = 30,height = 24,units = "cm",dpi=300)

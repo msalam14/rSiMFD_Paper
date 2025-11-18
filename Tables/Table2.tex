@@ -1,0 +1,25 @@
+\begin{table}
+\centering\centering
+\caption{\label{tab:peso_class_res}Accuracy, sensitivity, specificity and AUC observed for PESO data using the proposed approach with different classifiers in the cases of training data ($120$ patches from $30$ subject) and test data ($40$ patches from $10$ subjects) when Q functions were obtained from a  9 $\times$ 9 grid. Results are summarized from 100 such random splits.}
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{tabular}[t]{llrrrrrrrr}
+\toprule
+\multicolumn{1}{c}{} & \multicolumn{1}{c}{} & \multicolumn{2}{c}{Accuracy} & \multicolumn{2}{c}{Sensitivity} & \multicolumn{2}{c}{Specificity} & \multicolumn{2}{c}{AUC} \\
+\cmidrule(l{3pt}r{3pt}){3-4} \cmidrule(l{3pt}r{3pt}){5-6} \cmidrule(l{3pt}r{3pt}){7-8} \cmidrule(l{3pt}r{3pt}){9-10}
+Method & Version & Training & Test & Training & Test & Training & Test & Training & Test\\
+\midrule
+Logistic &  & 0.828 & 0.819 & 0.814 & 0.817 & 0.838 & 0.827 & 0.906 & 0.895\\
+$GAM_1$ & 5 knots & 0.858 & 0.813 & 0.823 & 0.779 & 0.886 & 0.846 & 0.931 & 0.901\\
+ & 8 knots & 0.863 & 0.812 & 0.824 & 0.779 & 0.895 & 0.845 & 0.937 & 0.898\\
+ & 10 knots & 0.863 & 0.812 & 0.824 & 0.779 & 0.895 & 0.845 & 0.937 & 0.897\\
+$GAM_2$ & 4 knots & 0.870 & 0.808 & 0.829 & 0.763 & 0.903 & 0.850 & 0.942 & 0.888\\
+ & 5 knots & 0.872 & 0.805 & 0.832 & 0.761 & 0.904 & 0.845 & 0.943 & 0.884\\
+ & 6 knots & 0.875 & 0.803 & 0.830 & 0.766 & 0.911 & 0.838 & 0.946 & 0.876\\
+SVM & Linear basis & 0.829 & 0.822 & 0.818 & 0.819 & 0.837 & 0.830 & 0.903 & 0.895\\
+ & Radial basis & 0.854 & 0.791 & 0.815 & 0.765 & 0.885 & 0.817 & 0.930 & 0.880\\
+\bottomrule
+\multicolumn{10}{l}{\textsuperscript{} Standard errors lie in [0.001,0.013].}\\
+\multicolumn{10}{l}{\textsuperscript{} $GAM_1$ and $GAM_2$ use univariate and bivariate smooth terms, respectively.}\\
+\end{tabular}}
+\end{table}

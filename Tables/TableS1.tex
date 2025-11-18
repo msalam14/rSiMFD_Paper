@@ -1,0 +1,35 @@
+\begin{table}
+\centering\centering
+\caption{\label{tab:peso_grid}Accuracy, sensitivity, specificity and AUC observed for PESO data using the proposed approach with different classifiers in the case of test data ($40$ patches from $10$ subjects) when Q functions were obtained at various grids. Values within parenthesis represent corresponding standard errors.}
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{threeparttable}
+\begin{tabular}[t]{lrccccc}
+\toprule
+\multicolumn{1}{c}{} & \multicolumn{1}{c}{} & \multicolumn{5}{c}{Grid size} \\
+\cmidrule(l{3pt}r{3pt}){3-7}
+Measures & Method & $5\times 5$ & $7\times 7$ & $9\times 9$ & $12\times 12$ & $16\times 16$\\
+\midrule
+Accuracy & Logistic & 0.739(0.008) & 0.804(0.007) & 0.819(0.005) & 0.771(0.007) & 0.778(0.007)\\
+ & $GAM_1$ & 0.736(0.007) & 0.794(0.008) & 0.813(0.006) & 0.802(0.007) & 0.809(0.008)\\
+ & $GAM_2$ & 0.740(0.008) & 0.754(0.007) & 0.808(0.007) & 0.790(0.007) & 0.800(0.008)\\
+ & SVM & 0.734(0.007) & 0.782(0.007) & 0.791(0.006) & 0.792(0.007) & 0.783(0.008)\\
+Sensitivity & Logistic & 0.677(0.013) & 0.757(0.011) & 0.817(0.011) & 0.748(0.012) & 0.768(0.013)\\
+ & $GAM_1$ & 0.671(0.013) & 0.738(0.013) & 0.779(0.012) & 0.761(0.013) & 0.765(0.015)\\
+ & $GAM_2$ & 0.679(0.013) & 0.683(0.013) & 0.763(0.013) & 0.746(0.013) & 0.729(0.015)\\
+ & SVM & 0.665(0.013) & 0.730(0.012) & 0.765(0.012) & 0.747(0.012) & 0.722(0.014)\\
+Specificity & Logistic & 0.797(0.009) & 0.841(0.008) & 0.827(0.009) & 0.794(0.009) & 0.793(0.010)\\
+ & $GAM_1$ & 0.797(0.009) & 0.838(0.008) & 0.846(0.007) & 0.837(0.007) & 0.850(0.008)\\
+ & $GAM_2$ & 0.796(0.010) & 0.811(0.009) & 0.850(0.008) & 0.827(0.008) & 0.860(0.008)\\
+ & SVM & 0.798(0.010) & 0.825(0.008) & 0.817(0.009) & 0.830(0.008) & 0.838(0.009)\\
+AUC & Logistic & 0.817(0.007) & 0.847(0.006) & 0.895(0.005) & 0.862(0.007) & 0.865(0.006)\\
+ & $GAM_1$ & 0.809(0.007) & 0.835(0.007) & 0.901(0.006) & 0.858(0.008) & 0.863(0.008)\\
+ & $GAM_2$ & 0.794(0.008) & 0.803(0.007) & 0.888(0.007) & 0.838(0.008) & 0.851(0.008)\\
+ & SVM & 0.780(0.008) & 0.824(0.007) & 0.880(0.006) & 0.835(0.008) & 0.833(0.009)\\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}[para]
+\item $GAM_1$ and $GAM_2$ use univariate and bivariate smooth terms, respectively
+\end{tablenotes}
+\end{threeparttable}}
+\end{table}

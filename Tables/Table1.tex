@@ -1,0 +1,24 @@
+\begin{table}[!htb]
+\centering
+\caption{\label{tab:cnn_res}Accuracy, sensitivity, specificity and AUC observed for PESO data using different CNN architectures in the cases of training data ($120$ patches from $30$ subject) and test data ($40$ patches from $10$ subjects).}
+\centering
+\begin{tabular}[t]{lrrrrrrr}
+\toprule
+\multicolumn{1}{c}{} & \multicolumn{1}{c}{} & \multicolumn{2}{c}{Accuracy} & \multicolumn{2}{c}{Sensitivity} & \multicolumn{2}{c}{Specificity} \\
+\cmidrule(l{3pt}r{3pt}){3-4} \cmidrule(l{3pt}r{3pt}){5-6} \cmidrule(l{3pt}r{3pt}){7-8}
+CNN & Version & Training & Test & Training & Test & Training & Test\\
+\midrule
+InceptionV3 & 1 & 0.537 & 0.509 & 0.315 & 0.318 & 0.702 & 0.696\\
+ & 2 & 0.493 & 0.518 & 0.441 & 0.456 & 0.547 & 0.538\\
+ & 3 & 0.484 & 0.456 & 0.651 & 0.645 & 0.343 & 0.331\\
+MobileNet & 1 & 0.817 & 0.775 & 0.732 & 0.711 & 0.883 & 0.828\\
+ & 2 & 0.729 & 0.656 & 0.529 & 0.488 & 0.882 & 0.807\\
+ & 3 & 0.544 & 0.539 & 0.120 & 0.120 & 0.880 & 0.880\\
+ResNet50 & 1 & 0.596 & 0.582 & 0.200 & 0.195 & 0.902 & 0.917\\
+ & 2 & 0.507 & 0.523 & 0.400 & 0.400 & 0.600 & 0.600\\
+ & 3 & 0.472 & 0.469 & 0.809 & 0.798 & 0.209 & 0.192\\
+\bottomrule
+\multicolumn{8}{l}{\textsuperscript{} Standard errors lie in [0.008,0.100]. Versions: pre-trained weight+no update}\\
+\multicolumn{8}{l}{(1); pre-trained + update (2); estimated weight (3).}\\
+\end{tabular}
+\end{table}
